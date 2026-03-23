@@ -418,6 +418,23 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(),
     ),
+    # Detected when config key is "audio" (provider_name="audio").
+    ProviderSpec(
+        name="audio",
+        keywords=("audio",),
+        env_key="HOSTED_AUDIO_API_KEY",
+        display_name="audio/Local",
+        litellm_prefix="hosted_audio",  # Llama-3-8B → hosted_audio/Llama-3-8B
+        skip_prefixes=(),
+        env_extras=(),
+        is_gateway=False,
+        is_local=True,
+        detect_by_key_prefix="",
+        detect_by_base_keyword="",
+        default_api_base="",  # user must provide in config
+        strip_model_prefix=False,
+        model_overrides=(),
+    ),
     # === Ollama (local, OpenAI-compatible) ===================================
     ProviderSpec(
         name="ollama",

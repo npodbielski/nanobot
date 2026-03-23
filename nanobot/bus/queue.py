@@ -3,6 +3,7 @@
 import asyncio
 
 from nanobot.bus.events import InboundMessage, OutboundMessage
+from nanobot.providers import LiteLLMProvider
 
 
 class MessageBus:
@@ -14,6 +15,7 @@ class MessageBus:
     """
 
     def __init__(self):
+        self.audio_provider: LiteLLMProvider | None = None
         self.inbound: asyncio.Queue[InboundMessage] = asyncio.Queue()
         self.outbound: asyncio.Queue[OutboundMessage] = asyncio.Queue()
 
