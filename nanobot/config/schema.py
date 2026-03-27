@@ -39,7 +39,8 @@ class AgentDefaults(Base):
     context_window_tokens: int = 65_536
     temperature: float = 0.1
     max_tool_iterations: int = 40
-    reasoning_effort: str | None = None  # low / medium / high - enables LLM thinking mode
+    context_budget_tokens: int = 0  # Max old-history tokens during tool iterations (0 = no trim)
+    reasoning_effort: str | None = None  # low / medium / high — enables LLM thinking mode
 
 
 class AgentsConfig(Base):
@@ -127,6 +128,14 @@ class ExecToolConfig(Base):
     timeout: int = 60
     path_append: str = ""
 
+
+class InputLimitsConfig(Base):
+    """Limits for user-provided multimodal inputs."""
+
+    max_input_images: int = 3
+    max_input_image_bytes: int = 10 * 1024 * 1024
+
+
 class MCPServerConfig(Base):
     """MCP server connection configuration (stdio or HTTP)."""
 
@@ -144,6 +153,7 @@ class ToolsConfig(Base):
 
     web: WebToolsConfig = Field(default_factory=WebToolsConfig)
     exec: ExecToolConfig = Field(default_factory=ExecToolConfig)
+    input_limits: InputLimitsConfig = Field(default_factory=InputLimitsConfig)
     restrict_to_workspace: bool = False  # If true, restrict all tool access to workspace directory
     mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)
 
@@ -250,8 +260,7 @@ class Config(BaseSettings):
         if p and p.api_base:
             return p.api_base
         # Only gateways get a default api_base here. Standard providers
-        # (like Moonshot) set their base URL via env vars in _setup_env
-        # to avoid polluting the global litellm.api_base.
+        # resolve their base URL from the registry in the provider constructor.
         if name:
             spec = find_by_name(name)
             if spec and (spec.is_gateway or spec.is_local) and spec.default_api_base:
