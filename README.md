@@ -110,6 +110,8 @@
 - [🌐 Agent Social Network](#-agent-social-network)
 - [⚙️ Configuration](#️-configuration)
   - [Providers](#providers)
+  - [Channel Settings](#channel-settings)
+    - [Retry Behavior](#retry-behavior)
   - [Web Search](#web-search)
   - [MCP (Model Context Protocol)](#mcp-model-context-protocol)
   - [Security](#security)
@@ -1248,9 +1250,43 @@ That's it! Environment variables, model routing, config matching, and `nanobot s
 | `detect_by_key_prefix` | Detect gateway by API key prefix | `"sk-or-"` |
 | `detect_by_base_keyword` | Detect gateway by API base URL | `"openrouter"` |
 | `strip_model_prefix` | Strip provider prefix before sending to gateway | `True` (for AiHubMix) |
+| `supports_max_completion_tokens` | Use `max_completion_tokens` instead of `max_tokens`; required for providers that reject both being set simultaneously (e.g. VolcEngine) | `True` |
 
 </details>
 
+### Channel Settings
+
+Global settings that apply to all channels. Configure under the `channels` section in `~/.nanobot/config.json`:
+
+```json
+{
+  "channels": {
+    "sendProgress": true,
+    "sendToolHints": false,
+    "sendMaxRetries": 3,
+    "telegram": { ... }
+  }
+}
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `sendProgress` | `true` | Stream agent's text progress to the channel |
+| `sendToolHints` | `false` | Stream tool-call hints (e.g. `read_file("…")`) |
+| `sendMaxRetries` | `3` | Max delivery attempts per outbound message, including the initial send (0-10 configured, minimum 1 actual attempt) |
+
+#### Retry Behavior
+
+When a channel send operation raises an error, nanobot retries with exponential backoff:
+
+- **Attempt 1**: Initial send
+- **Attempts 2-4**: Retry delays are 1s, 2s, 4s
+- **Attempts 5+**: Retry delay caps at 4s
+- **Transient failures** (network hiccups, temporary API limits): Retry usually succeeds
+- **Permanent failures** (invalid token, channel banned): All retries fail
+
+> [!NOTE]
+> When a channel is completely unavailable, there's no way to notify the user since we cannot reach them through that channel. Monitor logs for "Failed to send to {channel} after N attempts" to detect persistent delivery failures.
 
 ### Web Search
 
