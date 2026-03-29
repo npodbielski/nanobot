@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pprint
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
@@ -37,15 +38,15 @@ class BaseChannel(ABC):
         self._running = False
 
     async def transcribe_audio(self, file_path: str | Path) -> str:
-        """Transcribe an audio file via Groq Whisper. Returns empty string on failure."""
-        if self.bus.audio_provider:
-            try:
-                from nanobot.providers.transcription import TranscriptionProvider
-                provider = TranscriptionProvider(self.bus.audio_provider)
-                return await provider.transcribe(file_path)
-            except Exception as e:
-                logger.warning("{}: audio transcription failed: {}", self.name, e)
-                return ""
+        """Transcribe an audio file. Returns empty string on failure."""
+        
+        pprint.pprint(1)
+        pprint.pprint(self.bus)
+        pprint.pprint(self.bus.audio_provider_config)
+        if self.bus.audio_provider_config:
+            from nanobot.providers.transcription import TranscriptionProvider
+            provider = TranscriptionProvider(self.bus.audio_provider_config)
+            return await provider.transcribe(file_path)
 
         if not self.transcription_api_key:
             return ""

@@ -1,12 +1,13 @@
 """Voice transcription provider using Groq."""
 
 import os
+import pprint
 from pathlib import Path
 
 import httpx
 from loguru import logger
 
-from nanobot.providers import LiteLLMProvider
+from nanobot.config.schema import ProviderConfig
 
 
 class GroqTranscriptionProvider:
@@ -64,46 +65,64 @@ class GroqTranscriptionProvider:
         except Exception as e:
             logger.error("Groq transcription error: {}", e)
             return ""
-        
+
+
 class TranscriptionProvider:
-    """
-    Voice transcription provider using Groq's Whisper API.
+    """Initialize the transcription provider with the necessary configuration.
 
-    Groq offers extremely fast transcription with a generous free tier.
+    :param llm_provider_config: Configuration settings for the LLM provider.
     """
 
-    def __init__(self, llm_provider: LiteLLMProvider):
-        self.llm_provider = llm_provider
+    def __init__(self, llm_provider_config: dict[str, str|dict[str, str] ]):
+        self.llm_provider_config = llm_provider_config
 
     async def transcribe(self, file_path: str | Path) -> str:
+        """Transcribe audio file content to text using the configured LLM provider.
 
-        path = Path(file_path)
+            :param file_path: The path to the audio file to be transcribed.
+            :return: The transcribed text content, or an empty string on failure.
+        """
+        print(1.1)
+        path: Path = Path(file_path)
         if not path.exists():
             logger.error("Audio file not found: {}", file_path)
             return ""
-
+        print(1.2)
         try:
             async with httpx.AsyncClient() as client:
+                config = self.llm_provider_config
                 with open(path, "rb") as f:
                     files = {
-                        "file": (path.name, f)
-                    }
-                    headers = {
-                        "Authorization": f"Bearer {self.llm_provider.api_key}"
+                        "file": (path.name, f),
                     }
 
+                    extra_headers = config.get("extra_headers", {})
+                    if extra_headers and "model" in extra_headers:
+                        files["model"] = (None, str(extra_headers["model"]))
+
+                    if "api_key" in config:
+                        headers = {
+                            "Authorization": f"Bearer {config["api_key"]}"
+                        }
+
+                    data = None
+                    if extra_headers and "language" in extra_headers:
+                        data = {"language": extra_headers["language"]}
+
                     response = await client.post(
-                        self.llm_provider.api_base + "/audio/transcriptions",
+                        config["api_base"] + "/audio/transcriptions",
                         headers=headers,
                         files=files,
-                        data={"language": self.llm_provider.extra_headers.get("language", "en")},
+                        data=data,
                         timeout=60.0
                     )
 
                     response.raise_for_status()
                     data = response.json()
+                    print(34)
+                    pprint.pprint(data)
                     return data.get("text", "")
 
         except Exception as e:
-            logger.error("Custom provider transcription error: {}", e)
+            logger.error("Audio provider transcription error: {}", e)
             return ""
