@@ -354,7 +354,7 @@ class AgentLoop:
                     await on_stream_end(resuming=False)
                     _stream_buf = ""
 
-                clean = self._strip_think(response.content)
+                clean = self._strip_think(response.content or response.reasoning_content)
                 if response.finish_reason == "error":
                     logger.error("LLM returned error: {}", (clean or "")[:200])
                     final_content = clean or "Sorry, I encountered an error calling the AI model."
