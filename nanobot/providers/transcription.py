@@ -1,12 +1,13 @@
 """Voice transcription provider using Groq."""
 
 import os
+from io import BufferedReader, _BufferedReaderStream
 from pathlib import Path
 
 import httpx
 from loguru import logger
 
-from nanobot.providers import LiteLLMProvider
+from nanobot.config.schema import ProviderConfig
 
 
 class GroqTranscriptionProvider:
@@ -42,7 +43,7 @@ class GroqTranscriptionProvider:
         try:
             async with httpx.AsyncClient() as client:
                 with open(path, "rb") as f:
-                    files = {
+                    files: dict[str, tuple[str, BufferedReader[_BufferedReaderStream]] | tuple[None, str]] = {
                         "file": (path.name, f),
                         "model": (None, "whisper-large-v3"),
                     }
@@ -64,39 +65,40 @@ class GroqTranscriptionProvider:
         except Exception as e:
             logger.error("Groq transcription error: {}", e)
             return ""
-        
+
+
 class TranscriptionProvider:
-    """
-    Voice transcription provider using Groq's Whisper API.
 
-    Groq offers extremely fast transcription with a generous free tier.
-    """
-
-    def __init__(self, llm_provider: LiteLLMProvider):
-        self.llm_provider = llm_provider
-
+    def __init__(self, llm_provider_config: ProviderConfig):
+        self.llm_provider_config = llm_provider_config
+    
     async def transcribe(self, file_path: str | Path) -> str:
-
-        path = Path(file_path)
+        path: Path = Path(file_path)
         if not path.exists():
             logger.error("Audio file not found: {}", file_path)
             return ""
 
         try:
             async with httpx.AsyncClient() as client:
+                config = self.llm_provider_config
                 with open(path, "rb") as f:
-                    files = {
-                        "file": (path.name, f)
-                    }
-                    headers = {
-                        "Authorization": f"Bearer {self.llm_provider.api_key}"
+                    files: dict[str, tuple[str, BufferedReader[_BufferedReaderStream]] | tuple[None, str]] = {
+                        "file": (path.name, f),
                     }
 
+                    if config.extra_headers and "model" in config.extra_headers:
+                        files["model"] = (None, str(config.extra_headers["model"]))
+                    
+                    if config.api_key:
+                        headers = {
+                            "Authorization": f"Bearer {config.api_key}"
+                        }
+
                     response = await client.post(
-                        self.llm_provider.api_base + "/audio/transcriptions",
+                        config.api_base + "/audio/transcriptions",
                         headers=headers,
                         files=files,
-                        data={"language": self.llm_provider.extra_headers.get("language", "en")},
+                        data={"language": config.extra_headers.get("language", "en")},
                         timeout=60.0
                     )
 
@@ -105,5 +107,6 @@ class TranscriptionProvider:
                     return data.get("text", "")
 
         except Exception as e:
-            logger.error("Custom provider transcription error: {}", e)
+            logger.error("Audio provider transcription error: {}", e)
             return ""
+
