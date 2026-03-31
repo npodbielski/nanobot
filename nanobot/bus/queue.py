@@ -4,7 +4,6 @@ import asyncio
 
 from nanobot.bus.events import InboundMessage, OutboundMessage
 from nanobot.config.schema import ProviderConfig
-from nanobot.providers import LiteLLMProvider
 
 
 class MessageBus:

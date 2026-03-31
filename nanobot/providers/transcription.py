@@ -1,7 +1,7 @@
 """Voice transcription provider using Groq."""
 
 import os
-from io import BufferedReader, _BufferedReaderStream
+import pprint
 from pathlib import Path
 
 import httpx
@@ -43,7 +43,7 @@ class GroqTranscriptionProvider:
         try:
             async with httpx.AsyncClient() as client:
                 with open(path, "rb") as f:
-                    files: dict[str, tuple[str, BufferedReader[_BufferedReaderStream]] | tuple[None, str]] = {
+                    files = {
                         "file": (path.name, f),
                         "model": (None, "whisper-large-v3"),
                     }
@@ -68,37 +68,52 @@ class GroqTranscriptionProvider:
 
 
 class TranscriptionProvider:
+    """Initialize the transcription provider with the necessary configuration.
 
-    def __init__(self, llm_provider_config: ProviderConfig):
+    :param llm_provider_config: Configuration settings for the LLM provider.
+    """
+
+    def __init__(self, llm_provider_config: dict[str, str|dict[str, str] ]):
         self.llm_provider_config = llm_provider_config
-    
+
     async def transcribe(self, file_path: str | Path) -> str:
+        """Transcribe audio file content to text using the configured LLM provider.
+
+            :param file_path: The path to the audio file to be transcribed.
+            :return: The transcribed text content, or an empty string on failure.
+        """
+        print(1.1)
         path: Path = Path(file_path)
         if not path.exists():
             logger.error("Audio file not found: {}", file_path)
             return ""
-
+        print(1.2)
         try:
             async with httpx.AsyncClient() as client:
                 config = self.llm_provider_config
                 with open(path, "rb") as f:
-                    files: dict[str, tuple[str, BufferedReader[_BufferedReaderStream]] | tuple[None, str]] = {
+                    files = {
                         "file": (path.name, f),
                     }
 
-                    if config.extra_headers and "model" in config.extra_headers:
-                        files["model"] = (None, str(config.extra_headers["model"]))
-                    
-                    if config.api_key:
+                    extra_headers = config.get("extra_headers", {})
+                    if extra_headers and "model" in extra_headers:
+                        files["model"] = (None, str(extra_headers["model"]))
+
+                    if "api_key" in config:
                         headers = {
-                            "Authorization": f"Bearer {config.api_key}"
+                            "Authorization": f"Bearer {config["api_key"]}"
                         }
 
+                    data = None
+                    if extra_headers and "language" in extra_headers:
+                        data = {"language": extra_headers["language"]}
+
                     response = await client.post(
-                        config.api_base + "/audio/transcriptions",
+                        config["api_base"] + "/audio/transcriptions",
                         headers=headers,
                         files=files,
-                        data={"language": config.extra_headers.get("language", "en")},
+                        data=data,
                         timeout=60.0
                     )
 
@@ -107,6 +122,5 @@ class TranscriptionProvider:
                     return data.get("text", "")
 
         except Exception as e:
-            logger.error("Audio provider transcription error: {}", e)
+            logger.error("Custom provider transcription error: {}", e)
             return ""
-

@@ -1,6 +1,7 @@
 """CLI commands for nanobot."""
 
 import asyncio
+import pprint
 from contextlib import contextmanager, nullcontext
 
 import os
@@ -375,7 +376,7 @@ def _onboard_plugins(config_path: Path) -> None:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-def _make_provider(config: Config, model_name: str | None = None):
+def _make_provider(config: Config):
     """Create the appropriate LLM provider from config.
 
     Routing is driven by ``ProviderSpec.backend`` in the registry.
@@ -383,7 +384,7 @@ def _make_provider(config: Config, model_name: str | None = None):
     from nanobot.providers.base import GenerationSettings
     from nanobot.providers.registry import find_by_name
 
-    model = model_name or config.agents.defaults.model
+    model = config.agents.defaults.model
     provider_name = config.get_provider_name(model)
     p = config.get_provider(model)
     spec = find_by_name(provider_name) if provider_name else None
@@ -608,7 +609,7 @@ def gateway(
     sync_workspace_templates(config.workspace_path)
     bus = MessageBus()
     provider = _make_provider(config)
-    bus.audio_provider = config.get_provider("audio")
+    bus.audio_provider_config = config.providers.model_extra["audio"]
     session_manager = SessionManager(config.workspace_path)
 
     # Preserve existing single-workspace installs, but keep custom workspaces clean.

@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import mimetypes
+import pprint
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -820,9 +821,12 @@ class MatrixChannel(BaseChannel):
         parts: list[str] = []
         if isinstance(body := getattr(event, "body", None), str) and body.strip():
             parts.append(body.strip())
+            
+        pprint.pprint(attachment)
 
         if attachment and attachment.get("type") == "audio":
             transcription = await self.transcribe_audio(attachment["path"])
+            pprint.pprint(transcription)
             if transcription:
                 parts.append(f"[transcription: {transcription}]")
             else:
