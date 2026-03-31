@@ -37,12 +37,7 @@ class BaseChannel(ABC):
         self._running = False
 
     async def transcribe_audio(self, file_path: str | Path) -> str:
-        """Transcribe an audio file via  Groq Whisper. Returns empty string on failure."""
-        if self.bus.audio_provider_config:
-            from nanobot.providers.transcription import TranscriptionProvider
-            provider = TranscriptionProvider(self.bus.audio_provider_config)
-            return await provider.transcribe(file_path)
-
+        """Transcribe an audio file via Groq Whisper. Returns empty string on failure."""
         if not self.transcription_api_key:
             return ""
         try:
@@ -101,6 +96,10 @@ class BaseChannel(ABC):
 
         Override in subclasses to enable streaming. Implementations should
         raise on delivery failure so the channel manager can retry.
+
+        Streaming contract: ``_stream_delta`` is a chunk, ``_stream_end`` ends
+        the current segment, and stateful implementations must key buffers by
+        ``_stream_id`` rather than only by ``chat_id``.
         """
         pass
 
