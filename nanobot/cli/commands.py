@@ -1,7 +1,6 @@
 """CLI commands for nanobot."""
 
 import asyncio
-import pprint
 from contextlib import contextmanager, nullcontext
 
 import os
@@ -36,7 +35,7 @@ from rich.text import Text
 from nanobot import __logo__, __version__
 from nanobot.cli.stream import StreamRenderer, ThinkingSpinner
 from nanobot.config.paths import get_workspace_path, is_default_workspace
-from nanobot.config.schema import Config
+from nanobot.config.schema import Config, ProviderConfig
 from nanobot.utils.helpers import sync_workspace_templates
 
 app = typer.Typer(
@@ -609,7 +608,7 @@ def gateway(
     sync_workspace_templates(config.workspace_path)
     bus = MessageBus()
     provider = _make_provider(config)
-    bus.audio_provider_config = config.providers.model_extra["audio"]
+    bus.audio_provider_config = ProviderConfig.model_validate(config.providers.model_extra["audio"])
     session_manager = SessionManager(config.workspace_path)
 
     # Preserve existing single-workspace installs, but keep custom workspaces clean.
@@ -628,11 +627,9 @@ def gateway(
         model=config.agents.defaults.model,
         max_iterations=config.agents.defaults.max_tool_iterations,
         context_window_tokens=config.agents.defaults.context_window_tokens,
-        context_budget_tokens=config.agents.defaults.context_budget_tokens,
         web_search_config=config.tools.web.search,
         web_proxy=config.tools.web.proxy or None,
         exec_config=config.tools.exec,
-        input_limits=config.tools.input_limits,
         cron_service=cron,
         restrict_to_workspace=config.tools.restrict_to_workspace,
         session_manager=session_manager,
@@ -836,11 +833,9 @@ def agent(
         model=config.agents.defaults.model,
         max_iterations=config.agents.defaults.max_tool_iterations,
         context_window_tokens=config.agents.defaults.context_window_tokens,
-        context_budget_tokens=config.agents.defaults.context_budget_tokens,
         web_search_config=config.tools.web.search,
         web_proxy=config.tools.web.proxy or None,
         exec_config=config.tools.exec,
-        input_limits=config.tools.input_limits,
         cron_service=cron,
         restrict_to_workspace=config.tools.restrict_to_workspace,
         mcp_servers=config.tools.mcp_servers,

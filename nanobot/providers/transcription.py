@@ -1,7 +1,6 @@
 """Voice transcription provider using Groq."""
 
 import os
-import pprint
 from pathlib import Path
 
 import httpx
@@ -73,7 +72,7 @@ class TranscriptionProvider:
     :param llm_provider_config: Configuration settings for the LLM provider.
     """
 
-    def __init__(self, llm_provider_config: dict[str, str|dict[str, str] ]):
+    def __init__(self, llm_provider_config: ProviderConfig):
         self.llm_provider_config = llm_provider_config
 
     async def transcribe(self, file_path: str | Path) -> str:
@@ -82,12 +81,10 @@ class TranscriptionProvider:
             :param file_path: The path to the audio file to be transcribed.
             :return: The transcribed text content, or an empty string on failure.
         """
-        print(1.1)
         path: Path = Path(file_path)
         if not path.exists():
             logger.error("Audio file not found: {}", file_path)
             return ""
-        print(1.2)
         try:
             async with httpx.AsyncClient() as client:
                 config = self.llm_provider_config
@@ -96,22 +93,22 @@ class TranscriptionProvider:
                         "file": (path.name, f),
                     }
 
-                    extra_headers = config.get("extra_headers", {})
-                    if extra_headers and "model" in extra_headers:
-                        files["model"] = (None, str(extra_headers["model"]))
+                    if config.extra_headers and "model" in config.extra_headers:
+                        files["model"] = (None, str(config.extra_headers["model"]))
 
+                    h: dict[str, str] = {}
                     if "api_key" in config:
-                        headers = {
-                            "Authorization": f"Bearer {config["api_key"]}"
+                        h = {
+                            "Authorization": f"Bearer {config.api_key}"
                         }
 
                     data = None
-                    if extra_headers and "language" in extra_headers:
-                        data = {"language": extra_headers["language"]}
+                    if config.extra_headers and "language" in config.extra_headers:
+                        data = {"language": config.extra_headers["language"]}
 
                     response = await client.post(
-                        config["api_base"] + "/audio/transcriptions",
-                        headers=headers,
+                        config.api_base + "/audio/transcriptions",
+                        headers=h,
                         files=files,
                         data=data,
                         timeout=60.0
