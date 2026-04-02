@@ -36,7 +36,7 @@ from rich.text import Text
 from nanobot import __logo__, __version__
 from nanobot.cli.stream import StreamRenderer, ThinkingSpinner
 from nanobot.config.paths import get_workspace_path, is_default_workspace
-from nanobot.config.schema import Config
+from nanobot.config.schema import Config, ProviderConfig
 from nanobot.utils.helpers import sync_workspace_templates
 
 app = typer.Typer(

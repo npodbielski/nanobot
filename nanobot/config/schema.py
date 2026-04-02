@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Literal
 
+from nanobot.config.schema import Config
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 from pydantic_settings import BaseSettings
@@ -66,11 +67,13 @@ class ProviderConfig(Base):
     api_key: str = ""
     api_base: str | None = None
     extra_headers: dict[str, str] | None = None  # Custom headers (e.g. APP-Code for AiHubMix)
+    keywords: list[str] = Field(default_factory=list)
 
 
 class ProvidersConfig(Base):
     """Configuration for LLM providers."""
 
+    model_config = ConfigDict(extra="allow")
     custom: ProviderConfig = Field(default_factory=ProviderConfig)  # Any OpenAI-compatible endpoint
     azure_openai: ProviderConfig = Field(default_factory=ProviderConfig)  # Azure OpenAI (model = deployment name)
     anthropic: ProviderConfig = Field(default_factory=ProviderConfig)
@@ -278,4 +281,17 @@ class Config(BaseSettings):
                 return spec.default_api_base
         return None
 
+    def get_audio_provider(self) -> ProviderConfig | None:
+        extras = self.providers.model_extra
+        if "audio" in extras:
+            return ProviderConfig.model_validate(extras["audio"])
+        for prop_name in dir(self.providers):
+            if prop_name.startswith('_'):
+                continue
+            provider = getattr(self.providers, prop_name, None)
+            if isinstance(provider, ProviderConfig) and 'audio' in provider.keywords:
+                return provider
+        return None
+
     model_config = ConfigDict(env_prefix="NANOBOT_", env_nested_delimiter="__")
+

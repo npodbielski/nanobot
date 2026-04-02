@@ -788,7 +788,7 @@ def test_gateway_uses_workspace_directory_for_cron_store(monkeypatch, tmp_path: 
     _patch_cli_command_runtime(
         monkeypatch,
         config,
-        message_bus=lambda: object(),
+        message_bus=lambda: MagicMock(),
         session_manager=lambda _workspace: object(),
         cron_service=_StopCron,
     )
@@ -820,7 +820,7 @@ def test_gateway_workspace_override_does_not_migrate_legacy_cron(
     _patch_cli_command_runtime(
         monkeypatch,
         config,
-        message_bus=lambda: object(),
+        message_bus=lambda: MagicMock(),
         session_manager=lambda _workspace: object(),
         cron_service=_StopCron,
         get_cron_dir=lambda: legacy_dir,
@@ -859,7 +859,7 @@ def test_gateway_custom_config_workspace_does_not_migrate_legacy_cron(
     _patch_cli_command_runtime(
         monkeypatch,
         config,
-        message_bus=lambda: object(),
+        message_bus=lambda: MagicMock(),
         session_manager=lambda _workspace: object(),
         cron_service=_StopCron,
         get_cron_dir=lambda: legacy_dir,
