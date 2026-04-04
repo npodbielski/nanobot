@@ -141,6 +141,7 @@ def _build_matrix_text_content(
     text: str,
     event_id: str | None = None,
     thread_relates_to: dict[str, object] | None = None,
+        is_notice: bool = False
 ) -> dict[str, object]:
     """
     Constructs and returns a dictionary representing the matrix text content with optional
@@ -160,7 +161,7 @@ def _build_matrix_text_content(
         HTML formatting and replacement metadata if applicable.
     :rtype: dict[str, object]
     """
-    content: dict[str, object] = {"msgtype": "m.text", "body": text, "m.mentions": {}}
+    content: dict[str, object] = {"msgtype": "m.text" if not is_notice else "m.notice", "body": text, "m.mentions": {}}
     if html := _render_markdown_html(text):
         content["format"] = MATRIX_HTML_FORMAT
         content["formatted_body"] = html
@@ -457,6 +458,7 @@ class MatrixChannel(BaseChannel):
         if not self.client:
             return
         text = msg.content or ""
+        is_source_command = bool(msg.metadata.get('source') == 'command')
         candidates = self._collect_outbound_media_candidates(msg.media)
         relates_to = self._build_thread_relates_to(msg.metadata)
         is_progress = bool((msg.metadata or {}).get("_progress"))
@@ -475,7 +477,7 @@ class MatrixChannel(BaseChannel):
             if failures:
                 text = f"{text.rstrip()}\n{chr(10).join(failures)}" if text.strip() else "\n".join(failures)
             if text or not candidates:
-                content = _build_matrix_text_content(text)
+                content = _build_matrix_text_content(text, is_notice=is_source_command)
                 if relates_to:
                     content["m.relates_to"] = relates_to
                 await self._send_room_content(msg.chat_id, content)
@@ -485,22 +487,6 @@ class MatrixChannel(BaseChannel):
 
     async def send_delta(self, chat_id: str, delta: str, metadata: dict[str, Any] | None = None) -> None:
         meta = metadata or {}
-        relates_to = self._build_thread_relates_to(metadata)
-
-        if meta.get("_stream_end"):
-            buf = self._stream_bufs.pop(chat_id, None)
-            if not buf or not buf.event_id or not buf.text:
-                return
-
-            await self._stop_typing_keepalive(chat_id, clear_typing=True)
-            
-            content = _build_matrix_text_content(
-                buf.text,
-                buf.event_id,
-                thread_relates_to=relates_to,
-            )
-            await self._send_room_content(chat_id, content)
-            return
 
         buf = self._stream_bufs.get(chat_id)
         if buf is None:

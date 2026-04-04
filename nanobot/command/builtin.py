@@ -29,7 +29,7 @@ async def cmd_stop(ctx: CommandContext) -> OutboundMessage:
     content = f"Stopped {total} task(s)." if total else "No active task to stop."
     return OutboundMessage(
         channel=msg.channel, chat_id=msg.chat_id, content=content,
-        metadata=dict(msg.metadata or {})
+        metadata={**dict(ctx.msg.metadata or {}), "source": "command"},
     )
 
 
@@ -45,7 +45,7 @@ async def cmd_restart(ctx: CommandContext) -> OutboundMessage:
     asyncio.create_task(_do_restart())
     return OutboundMessage(
         channel=msg.channel, chat_id=msg.chat_id, content="Restarting...",
-        metadata=dict(msg.metadata or {})
+        metadata={**dict(ctx.msg.metadata or {}), "source": "command"},
     )
 
 
@@ -70,7 +70,7 @@ async def cmd_status(ctx: CommandContext) -> OutboundMessage:
             session_msg_count=len(session.get_history(max_messages=0)),
             context_tokens_estimate=ctx_est,
         ),
-        metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        metadata={**dict(ctx.msg.metadata or {}), "render_as": "text", "source": "command"},
     )
 
 
@@ -87,7 +87,7 @@ async def cmd_new(ctx: CommandContext) -> OutboundMessage:
     return OutboundMessage(
         channel=ctx.msg.channel, chat_id=ctx.msg.chat_id,
         content="New session started.",
-        metadata=dict(ctx.msg.metadata or {})
+        metadata={**dict(ctx.msg.metadata or {}), "source": "command"},
     )
 
 
@@ -101,6 +101,7 @@ async def cmd_dream(ctx: CommandContext) -> OutboundMessage:
         content = f"Dream failed: {e}"
     return OutboundMessage(
         channel=ctx.msg.channel, chat_id=ctx.msg.chat_id, content=content,
+        metadata={**dict(ctx.msg.metadata or {}), "source": "command"},
     )
 
 
@@ -222,7 +223,7 @@ async def cmd_dream_log(ctx: CommandContext) -> OutboundMessage:
 
     return OutboundMessage(
         channel=ctx.msg.channel, chat_id=ctx.msg.chat_id,
-        content=content, metadata={"render_as": "text"},
+        content=content, metadata={"render_as": "text", "source": "command"},
     )
 
 
@@ -268,7 +269,7 @@ async def cmd_dream_restore(ctx: CommandContext) -> OutboundMessage:
             )
     return OutboundMessage(
         channel=ctx.msg.channel, chat_id=ctx.msg.chat_id,
-        content=content, metadata={"render_as": "text"},
+        content=content, metadata={"render_as": "text", "source": "command"},
     )
 
 
@@ -278,7 +279,7 @@ async def cmd_help(ctx: CommandContext) -> OutboundMessage:
         channel=ctx.msg.channel,
         chat_id=ctx.msg.chat_id,
         content=build_help_text(),
-        metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        metadata={**dict(ctx.msg.metadata or {}), "render_as": "text", "source": "command"},
     )
 
 
