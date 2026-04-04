@@ -99,6 +99,7 @@ MATRIX_HTML_CLEANER = nh3.Cleaner(
     link_rel="noopener noreferrer",
 )
 
+
 @dataclass
 class _StreamBuf:
     """
@@ -117,6 +118,7 @@ class _StreamBuf:
     last_edit: float = 0.0
     during_responding: bool = False
     eof: bool = False
+    edits: int = 0
 
 
 def _render_markdown_html(text: str) -> str | None:
@@ -156,7 +158,7 @@ def _build_matrix_text_content(text: str, event_id: str | None = None) -> dict[s
         content["format"] = MATRIX_HTML_FORMAT
         content["formatted_body"] = html
         if event_id:
-            content["m.new_content"] =  {
+            content["m.new_content"] = {
                 "msgtype": "m.text",
                 "body": text,
                 "format": MATRIX_HTML_FORMAT,
@@ -215,7 +217,8 @@ class MatrixChannel(BaseChannel):
 
     name = "matrix"
     display_name = "Matrix"
-    _STREAM_EDIT_INTERVAL = 1.6 # min seconds between edit_message_text calls
+    _STREAM_EDIT_INTERVAL = 1.6  # min seconds between edit_message_text calls
+    _STREAM_EDIT_LIMIT = 1000
     monotonic_time = time.monotonic
 
     @classmethod
@@ -243,7 +246,6 @@ class MatrixChannel(BaseChannel):
         self._server_upload_limit_bytes: int | None = None
         self._server_upload_limit_checked = False
         self._stream_bufs: dict[str, _StreamBuf] = {}
-
 
     async def start(self) -> None:
         """Start Matrix client and begin sync loop."""
@@ -483,35 +485,39 @@ class MatrixChannel(BaseChannel):
         if not buf.text.strip() or buf.during_responding:
             return
 
+        buf.during_responding = True
+
         if buf.eof:
             buf = self._stream_bufs.pop(chat_id, None)
-            if not buf or buf.during_responding:
-                return
-
             await self._stop_typing_keepalive(chat_id, clear_typing=True)
-
-        now = self.monotonic_time()
+            if not buf:
+                return
 
         try:
             current_text = ""
             while (len(current_text) < len(buf.text)
-                    and ((now - buf.last_edit) >= self._STREAM_EDIT_INTERVAL or buf.eof)):
-                buf.during_responding = True
+                   and ((self.monotonic_time() - buf.last_edit) >= self._STREAM_EDIT_INTERVAL or buf.eof)):
                 current_text = buf.text
-                content = _build_matrix_text_content(current_text, buf.event_id)
                 relates_to = self._build_thread_relates_to(metadata)
-                if not buf.event_id and relates_to:
-                    content["m.relates_to"] = relates_to
-                response = await self._send_room_content(chat_id, content)
-                buf.last_edit = now
-                if not buf.event_id:
-                    # we are editing the same message all the time, so only the first time the event id needs to be set
-                    buf.event_id = response.event_id
+
+                # if we exceed the edit limit, we just wait till the end of the stream
+                if buf.edits < self._STREAM_EDIT_LIMIT or buf.eof:
+                    content = _build_matrix_text_content(current_text, buf.event_id)
+                    if not buf.event_id and relates_to:
+                        content["m.relates_to"] = relates_to
+                    response = await self._send_room_content(chat_id, content)
+                    if not buf.event_id:
+                        # we are editing the same message all the time, so only the first time the event id needs to be set
+                        buf.event_id = response.event_id
+                    buf.edits += 1
+
+                buf.last_edit = self.monotonic_time()
+
             buf.during_responding = False
+
         except Exception:
             await self._stop_typing_keepalive(chat_id, clear_typing=True)
             pass
-
 
     def _register_event_callbacks(self) -> None:
         self.client.add_event_callback(self._on_message, RoomMessageText)
