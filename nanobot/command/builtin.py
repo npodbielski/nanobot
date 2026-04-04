@@ -26,9 +26,11 @@ async def cmd_stop(ctx: CommandContext) -> OutboundMessage:
     sub_cancelled = await loop.subagents.cancel_by_session(msg.session_key)
     total = cancelled + sub_cancelled
     content = f"Stopped {total} task(s)." if total else "No active task to stop."
+    meta = ctx.msg.metadata or {}
+    meta['source'] = 'command'
     return OutboundMessage(
         channel=msg.channel, chat_id=msg.chat_id, content=content,
-        metadata=dict(msg.metadata or {})
+        metadata=dict(meta)
     )
 
 
@@ -40,10 +42,12 @@ async def cmd_restart(ctx: CommandContext) -> OutboundMessage:
         await asyncio.sleep(1)
         os.execv(sys.executable, [sys.executable, "-m", "nanobot"] + sys.argv[1:])
 
+    meta = ctx.msg.metadata or {}
+    meta['source'] = 'command'
     asyncio.create_task(_do_restart())
     return OutboundMessage(
         channel=msg.channel, chat_id=msg.chat_id, content="Restarting...",
-        metadata=dict(msg.metadata or {})
+        metadata=dict(meta)
     )
 
 
@@ -58,6 +62,8 @@ async def cmd_status(ctx: CommandContext) -> OutboundMessage:
         pass
     if ctx_est <= 0:
         ctx_est = loop._last_usage.get("prompt_tokens", 0)
+    meta = ctx.msg.metadata or {"render_as": "text"}
+    meta['source'] = 'command'
     return OutboundMessage(
         channel=ctx.msg.channel,
         chat_id=ctx.msg.chat_id,
@@ -68,7 +74,7 @@ async def cmd_status(ctx: CommandContext) -> OutboundMessage:
             session_msg_count=len(session.get_history(max_messages=0)),
             context_tokens_estimate=ctx_est,
         ),
-        metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        metadata=dict(meta)
     )
 
 
@@ -82,10 +88,12 @@ async def cmd_new(ctx: CommandContext) -> OutboundMessage:
     loop.sessions.invalidate(session.key)
     if snapshot:
         loop._schedule_background(loop.consolidator.archive(snapshot))
+    meta = ctx.msg.metadata or {}
+    meta['source'] = 'command'
     return OutboundMessage(
         channel=ctx.msg.channel, chat_id=ctx.msg.chat_id,
         content="New session started.",
-        metadata=dict(ctx.msg.metadata or {})
+        metadata=dict(meta)
     )
 
 
@@ -97,8 +105,11 @@ async def cmd_dream(ctx: CommandContext) -> OutboundMessage:
         content = "Dream completed." if did_work else "Dream: nothing to process."
     except Exception as e:
         content = f"Dream failed: {e}"
+    meta = ctx.msg.metadata or {}
+    meta['source'] = 'command'
     return OutboundMessage(
         channel=ctx.msg.channel, chat_id=ctx.msg.chat_id, content=content,
+        metadata=dict(meta)
     )
 
 
@@ -141,9 +152,11 @@ async def cmd_dream_log(ctx: CommandContext) -> OutboundMessage:
         else:
             content = "No commits yet."
 
+    meta = ctx.msg.metadata or {"render_as": "text"}
+    meta['source'] = 'command'
     return OutboundMessage(
         channel=ctx.msg.channel, chat_id=ctx.msg.chat_id,
-        content=content, metadata={"render_as": "text"},
+        content=content, metadata=dict(meta),
     )
 
 
@@ -180,19 +193,23 @@ async def cmd_dream_restore(ctx: CommandContext) -> OutboundMessage:
             content = f"Reverted commit `{sha}` → new commit `{new_sha}`."
         else:
             content = f"Failed to revert commit `{sha}`. Check if the SHA is correct."
+    meta = ctx.msg.metadata or {"render_as": "text"}
+    meta['source'] = 'command'
     return OutboundMessage(
         channel=ctx.msg.channel, chat_id=ctx.msg.chat_id,
-        content=content, metadata={"render_as": "text"},
+        content=content, metadata=dict(meta),
     )
 
 
 async def cmd_help(ctx: CommandContext) -> OutboundMessage:
     """Return available slash commands."""
+    meta = ctx.msg.metadata or {"render_as": "text"}
+    meta['source'] = 'command'
     return OutboundMessage(
         channel=ctx.msg.channel,
         chat_id=ctx.msg.chat_id,
         content=build_help_text(),
-        metadata={**dict(ctx.msg.metadata or {}), "render_as": "text"},
+        metadata=dict(meta),
     )
 
 
