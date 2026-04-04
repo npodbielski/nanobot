@@ -115,6 +115,9 @@ class _StreamBuf:
     text: str = ""
     event_id: str | None = None
     last_edit: float = 0.0
+    during_responding: bool = False
+    eof: bool = False
+
 
 def _render_markdown_html(text: str) -> str | None:
     """Render markdown to sanitized HTML; returns None for plain text."""
@@ -161,8 +164,10 @@ def _build_matrix_text_content(
         content["formatted_body"] = html
     if event_id:
         content["m.new_content"] = {
-            "body": text,
-            "msgtype": "m.text",
+                "msgtype": "m.text",
+                "body": text,
+                "format": MATRIX_HTML_FORMAT,
+                "formatted_body": html
         }
         content["m.relates_to"] = {
             "rel_type": "m.replace",
@@ -221,7 +226,7 @@ class MatrixChannel(BaseChannel):
 
     name = "matrix"
     display_name = "Matrix"
-    _STREAM_EDIT_INTERVAL = 2 # min seconds between edit_message_text calls
+    _STREAM_EDIT_INTERVAL = 1.6 # min seconds between edit_message_text calls
     monotonic_time = time.monotonic
 
     @classmethod
@@ -393,8 +398,8 @@ class MatrixChannel(BaseChannel):
         return min(local_limit, server_limit) if local_limit else 0
 
     async def _upload_and_send_attachment(
-        self, room_id: str, path: Path, limit_bytes: int,
-        relates_to: dict[str, Any] | None = None,
+            self, room_id: str, path: Path, limit_bytes: int,
+            relates_to: dict[str, Any] | None = None,
     ) -> str | None:
         """Upload one local file to Matrix and send it as a media message. Returns failure marker or None."""
         if not self.client:
@@ -496,30 +501,44 @@ class MatrixChannel(BaseChannel):
 
         buf = self._stream_bufs.get(chat_id)
         if buf is None:
-            buf = _StreamBuf()
-            self._stream_bufs[chat_id] = buf
-        buf.text += delta
-    
-        if not buf.text.strip():
+            buf = self._stream_bufs[chat_id] = _StreamBuf(text=delta)
+        else:
+            buf.text += delta
+
+        if meta.get("_stream_end"):
+            buf.eof = True
+
+        if not buf.text.strip() or buf.during_responding:
             return
+
+        if buf.eof:
+            buf = self._stream_bufs.pop(chat_id, None)
+            if not buf or buf.during_responding:
+                return
+
+            await self._stop_typing_keepalive(chat_id, clear_typing=True)
 
         now = self.monotonic_time()
 
-        if not buf.last_edit or (now - buf.last_edit) >= self._STREAM_EDIT_INTERVAL:
-            try:
-                content = _build_matrix_text_content(
-                    buf.text,
-                    buf.event_id,
-                    thread_relates_to=relates_to,
-                )
+        try:
+            current_text = ""
+            while (len(current_text) < len(buf.text)
+                   and ((now - buf.last_edit) >= self._STREAM_EDIT_INTERVAL or buf.eof)):
+                buf.during_responding = True
+                current_text = buf.text
+                content = _build_matrix_text_content(current_text, buf.event_id)
+                relates_to = self._build_thread_relates_to(metadata)
+                if not buf.event_id and relates_to:
+                    content["m.relates_to"] = relates_to
                 response = await self._send_room_content(chat_id, content)
                 buf.last_edit = now
                 if not buf.event_id:
                     # we are editing the same message all the time, so only the first time the event id needs to be set
                     buf.event_id = response.event_id
-            except Exception:
-                await self._stop_typing_keepalive(chat_id, clear_typing=True)
-                pass
+            buf.during_responding = False
+        except Exception:
+            await self._stop_typing_keepalive(chat_id, clear_typing=True)
+            pass
 
 
     def _register_event_callbacks(self) -> None:
